@@ -1,5 +1,6 @@
 import NiceModal from '@ebay/nice-modal-react'
 import {
+  Alert,
   Badge,
   Button,
   Flex,
@@ -18,6 +19,7 @@ import {
   IconDiscount2,
   IconExternalLink,
   IconHelpCircle,
+  IconInfoCircle,
   IconPlus,
   IconRefresh,
   IconRestore,
@@ -26,10 +28,11 @@ import {
 } from '@tabler/icons-react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { uniq } from 'lodash'
-import { type ChangeEvent, useCallback, useState } from 'react'
+import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SystemProviders } from 'src/shared/defaults'
 import { ModelProviderEnum, ModelProviderType, type ProviderModelInfo } from 'src/shared/types'
+import { useAuthStore } from '@/stores/authStore'
 import {
   normalizeAzureEndpoint,
   normalizeClaudeHost,
@@ -85,6 +88,12 @@ function normalizeAPIHost(
 
 export function RouteComponent() {
   const { providerId } = Route.useParams()
+  
+  // EnterAI 使用特殊的设置组件
+  if (providerId === 'enter-ai') {
+    return <EnterAISettings key={providerId} />
+  }
+  
   return <ProviderSettings key={providerId} providerId={providerId} />
 }
 
@@ -808,6 +817,499 @@ function ProviderSettings({ providerId }: { providerId: string }) {
               {t('Confirm')}
             </Button>
           </Flex>
+        </Modal>
+      </Stack>
+    </Stack>
+  )
+}
+
+// ============================================
+// EnterAI 专用设置组件
+// ============================================
+interface SystemProvider {
+  id: number
+  providerId: string
+  name: string
+  apiStyle: string
+  apiHost: string
+  apiKey: string
+  hasSystemKey?: boolean
+  enabled: boolean
+  allowCustomKey: boolean
+  models: Array<{
+    modelId: string
+    nickname?: string
+    capabilities?: string[]
+  }>
+  isDefault: boolean
+  sortOrder: number
+}
+
+function EnterAISettings() {
+  const { t } = useTranslation()
+  const { isAdmin, isAuthenticated, token } = useAuthStore()
+  const { setSettings, ...settings } = useSettingsStore((state) => state)
+
+  const providerId = ModelProviderEnum.EnterAI
+  const baseInfo = SystemProviders.find((p) => p.id === providerId)
+
+  const { providerSettings, setProviderSettings } = useProviderSettings(providerId)
+
+  // 从后端获取的系统配置
+  const [systemConfig, setSystemConfig] = useState<SystemProvider | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  // 是否允许编辑 - 只有已登录的管理员才能编辑
+  const canEdit = isAuthenticated === true && isAdmin === true
+
+  // 加载系统配置
+  useEffect(() => {
+    const fetchSystemConfig = async () => {
+      try {
+        // 管理员使用 admin API 获取完整配置（包含 API Key）
+        // 普通用户使用 config API 获取公开配置
+        const endpoint = canEdit && token
+          ? `/api/admin/providers`
+          : `/api/config/providers`
+        
+        const headers: Record<string, string> = {}
+        if (canEdit && token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+        
+        const response = await fetch(endpoint, { headers })
+        if (response.ok) {
+          const data = await response.json()
+          const enterAIConfig = data.providers?.find(
+            (p: any) => p.providerId === 'enter-ai' || p.name === 'EnterAI'
+          )
+          if (enterAIConfig) {
+            setSystemConfig(enterAIConfig)
+            // 使用系统配置更新本地设置
+            const models: ProviderModelInfo[] = enterAIConfig.models?.map((m: any) => ({
+              modelId: m.modelId,
+              nickname: m.nickname,
+              capabilities: m.capabilities,
+              contextWindow: m.contextWindow,
+              maxOutput: m.maxOutput,
+              type: m.type,
+            })) || []
+            setProviderSettings({
+              apiHost: enterAIConfig.apiHost || '',
+              apiKey: canEdit ? (enterAIConfig.apiKey || '') : (providerSettings?.apiKey || ''),
+              models,
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch system config:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSystemConfig()
+  }, [canEdit])
+
+  // 管理员保存配置到后端
+  const saveToServer = async () => {
+    if (!canEdit) return
+
+    setSaving(true)
+    try {
+      const models = displayModels.map((m) => ({
+        modelId: m.modelId,
+        nickname: m.nickname || '',
+        capabilities: m.capabilities || [],
+        contextWindow: m.contextWindow,
+        maxOutput: m.maxOutput,
+        type: m.type,
+      }))
+
+      const payload = {
+        providerId: 'enter-ai',
+        name: 'EnterAI',
+        apiStyle: 'openai',
+        apiHost: providerSettings?.apiHost || '',
+        apiKey: providerSettings?.apiKey || '',
+        enabled: true,
+        allowCustomKey: systemConfig?.allowCustomKey ?? false,
+        models,
+        isDefault: true,
+        sortOrder: 0,
+      }
+
+      let response: Response
+      if (systemConfig?.id) {
+        // 更新
+        response = await fetch(`/api/admin/providers/${systemConfig.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        })
+      } else {
+        // 创建
+        response = await fetch(`/api/admin/providers`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        })
+      }
+
+      if (response.ok) {
+        const data = await response.json()
+        setSystemConfig(data)
+        addToast(t('Saved successfully'))
+        // 同步到本地存储，确保前端请求使用最新配置
+        // 注意：本地存储已经通过 setProviderSettings 更新了
+      } else {
+        const error = await response.json()
+        addToast(t('Save failed') + ': ' + (error.error || 'Unknown error'))
+      }
+    } catch (error: any) {
+      console.error('Failed to save to server:', error)
+      addToast(t('Save failed') + ': ' + (error.message || 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // 对于非管理员，优先使用服务器配置的模型（包含完整信息）
+  // 对于管理员，使用本地设置的模型（可编辑）
+  const displayModels = useMemo(() => {
+    if (canEdit) {
+      // 管理员使用本地设置
+      return providerSettings?.models || baseInfo?.defaultSettings?.models || []
+    }
+    // 非管理员优先使用服务器配置
+    const serverModels: ProviderModelInfo[] = systemConfig?.models?.map((m: any) => ({
+      modelId: m.modelId,
+      nickname: m.nickname,
+      capabilities: m.capabilities,
+      contextWindow: m.contextWindow,
+      maxOutput: m.maxOutput,
+      type: m.type,
+    })) || []
+    return serverModels.length > 0 ? serverModels : (providerSettings?.models || [])
+  }, [canEdit, providerSettings?.models, systemConfig?.models, baseInfo?.defaultSettings?.models])
+
+  const handleApiKeyChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setProviderSettings({
+      apiKey: e.currentTarget.value,
+    })
+  }
+
+  const handleApiHostChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setProviderSettings({
+      apiHost: e.currentTarget.value,
+    })
+  }
+
+  const handleAddModel = async () => {
+    const newModel: ProviderModelInfo = await NiceModal.show('model-edit', { providerId })
+    if (!newModel?.modelId) {
+      return
+    }
+
+    if (displayModels?.find((m) => m.modelId === newModel.modelId)) {
+      addToast(t('already existed'))
+      return
+    }
+
+    setProviderSettings({
+      models: [...displayModels, newModel],
+    })
+  }
+
+  const editModel = async (model: ProviderModelInfo) => {
+    const newModel: ProviderModelInfo = await NiceModal.show('model-edit', { model, providerId })
+    if (!newModel?.modelId) {
+      return
+    }
+
+    setProviderSettings({
+      models: displayModels.map((m) => (m.modelId === newModel.modelId ? newModel : m)),
+    })
+  }
+
+  const deleteModel = (modelId: string) => {
+    setProviderSettings({
+      models: displayModels.filter((m) => m.modelId !== modelId),
+    })
+  }
+
+  const resetModels = () => {
+    setProviderSettings({
+      models: baseInfo?.defaultSettings?.models,
+    })
+  }
+
+  const [fetchingModels, setFetchingModels] = useState(false)
+  const [fetchedModels, setFetchedModels] = useState<ProviderModelInfo[]>()
+  const [checkingConnection, setCheckingConnection] = useState(false)
+
+  // 检查连接
+  const handleCheckConnection = async () => {
+    if (!providerSettings?.apiKey || displayModels.length === 0) return
+    
+    setCheckingConnection(true)
+    try {
+      const testModel = displayModels[0]
+      const apiHost = providerSettings?.apiHost || 'https://api.openai.com'
+      const normalizedHost = normalizeOpenAIApiHostAndPath({ apiHost })
+      
+      const response = await fetch(`${normalizedHost.apiHost}${normalizedHost.apiPath}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${providerSettings.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: testModel.modelId,
+          messages: [{ role: 'user', content: 'Hi' }],
+          max_tokens: 5,
+        }),
+      })
+      
+      if (response.ok) {
+        addToast(t('Connection successful!'))
+      } else {
+        const error = await response.json().catch(() => ({}))
+        addToast(t('Connection failed') + ': ' + (error.error?.message || response.statusText))
+      }
+    } catch (error: any) {
+      addToast(t('Connection failed') + ': ' + (error.message || 'Network error'))
+    } finally {
+      setCheckingConnection(false)
+    }
+  }
+
+  const handleFetchModels = async () => {
+    try {
+      setFetchedModels(undefined)
+      setFetchingModels(true)
+      const modelConfig = getModelSettingUtil(baseInfo!.id, baseInfo!.isCustom ? baseInfo!.type : undefined)
+      const modelList = await modelConfig.getMergeOptionGroups({
+        ...baseInfo?.defaultSettings,
+        ...providerSettings,
+      })
+
+      if (modelList.length) {
+        setFetchedModels(modelList)
+      } else {
+        addToast(t('Failed to fetch models'))
+      }
+      setFetchingModels(false)
+    } catch (error) {
+      console.error('Failed to fetch models', error)
+      setFetchedModels(undefined)
+      setFetchingModels(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <Flex justify="center" align="center" h={200}>
+        <Loader />
+      </Flex>
+    )
+  }
+
+  if (!baseInfo) {
+    return <Text>{t('Provider not found')}</Text>
+  }
+
+  return (
+    <Stack key={baseInfo.id} gap="xxl">
+      <Flex gap="xs" align="center">
+        <Title order={3} c="chatbox-secondary">
+          EnterAI
+        </Title>
+        <Badge color="blue" variant="light">
+          {t('System Default')}
+        </Badge>
+      </Flex>
+
+      {!isAuthenticated && (
+        <Alert icon={<IconInfoCircle size={16} />} color="blue">
+          {t('Login as administrator to configure this provider')}
+        </Alert>
+      )}
+
+      {isAuthenticated && !isAdmin && (
+        <Alert icon={<IconInfoCircle size={16} />} color="yellow">
+          {t('Only administrators can modify EnterAI configuration')}
+        </Alert>
+      )}
+
+      <Stack gap="xl">
+        {/* Description */}
+        <Stack gap="xxs">
+          <Text span size="xs" c="chatbox-tertiary">
+            {t('System default AI provider')}
+          </Text>
+        </Stack>
+
+        {/* API Key - 只有管理员可以查看和编辑 */}
+        <Stack gap="xxs">
+          <Text span fw="600">
+            {t('API Key')}
+          </Text>
+          {canEdit ? (
+            <Flex gap="xs" align="center">
+              <PasswordInput
+                flex={1}
+                value={providerSettings?.apiKey || ''}
+                onChange={handleApiKeyChange}
+                placeholder={t('Enter API Key')}
+              />
+              <Button
+                size="sm"
+                disabled={!providerSettings?.apiKey || displayModels.length === 0}
+                loading={checkingConnection}
+                onClick={handleCheckConnection}
+              >
+                {t('Check')}
+              </Button>
+            </Flex>
+          ) : (
+            <Text size="sm" c="chatbox-tertiary">
+              {systemConfig?.hasSystemKey || systemConfig?.apiKey ? '••••••••••••••••' : t('Not configured')}
+            </Text>
+          )}
+        </Stack>
+
+        {/* API Host */}
+        <Stack gap="xxs">
+          <Flex justify="space-between" align="flex-end" gap="md">
+            <Text span fw="600" className="whitespace-nowrap">
+              {t('API Host')}
+            </Text>
+          </Flex>
+          {canEdit ? (
+            <>
+              <Flex gap="xs" align="center">
+                <TextInput
+                  flex={1}
+                  value={providerSettings?.apiHost || ''}
+                  placeholder="https://api.openai.com"
+                  onChange={handleApiHostChange}
+                />
+              </Flex>
+              <Text span size="xs" flex="0 1 auto" c="chatbox-secondary">
+                {normalizeOpenAIApiHostAndPath({
+                  apiHost: providerSettings?.apiHost || 'https://api.openai.com',
+                }).apiHost +
+                  normalizeOpenAIApiHostAndPath({
+                    apiHost: providerSettings?.apiHost || 'https://api.openai.com',
+                  }).apiPath}
+              </Text>
+            </>
+          ) : (
+            <Text size="sm" c="chatbox-tertiary">
+              {systemConfig?.apiHost || providerSettings?.apiHost || t('Not configured')}
+            </Text>
+          )}
+        </Stack>
+
+        {/* Models */}
+        <Stack gap="xxs">
+          <Flex justify="space-between" align="center">
+            <Text span fw="600">
+              {t('Model')}
+            </Text>
+            {canEdit && (
+              <Flex gap="sm" align="center" justify="flex-end">
+                <Button
+                  variant="light"
+                  size="compact-xs"
+                  px="sm"
+                  onClick={handleAddModel}
+                  leftSection={<ScalableIcon icon={IconPlus} size={12} />}
+                >
+                  {t('New')}
+                </Button>
+
+                <Button
+                  variant="light"
+                  color="chatbox-gray"
+                  c="chatbox-secondary"
+                  size="compact-xs"
+                  px="sm"
+                  onClick={resetModels}
+                  leftSection={<ScalableIcon icon={IconRestore} size={12} />}
+                >
+                  {t('Reset')}
+                </Button>
+
+                <Button
+                  loading={fetchingModels}
+                  variant="light"
+                  color="chatbox-gray"
+                  c="chatbox-secondary"
+                  size="compact-xs"
+                  px="sm"
+                  onClick={handleFetchModels}
+                  leftSection={<ScalableIcon icon={IconRefresh} size={12} />}
+                >
+                  {t('Fetch')}
+                </Button>
+              </Flex>
+            )}
+          </Flex>
+
+          <ModelList
+            models={displayModels}
+            showActions={canEdit}
+            showSearch={false}
+            onEditModel={canEdit ? editModel : undefined}
+            onDeleteModel={canEdit ? deleteModel : undefined}
+          />
+        </Stack>
+
+        {/* Save Button for Admin */}
+        {canEdit && (
+          <Flex justify="flex-end" mt="md">
+            <Button
+              onClick={saveToServer}
+              loading={saving}
+              color="blue"
+            >
+              {t('Save to Server')}
+            </Button>
+          </Flex>
+        )}
+
+        {/* Fetched Models Modal */}
+        <Modal
+          keepMounted={false}
+          opened={!!fetchedModels}
+          onClose={() => {
+            setFetchedModels(undefined)
+          }}
+          title={t('Edit Model')}
+          centered={true}
+          classNames={{
+            content: '!max-h-[95vh]',
+          }}
+        >
+          <ModelList
+            models={fetchedModels || []}
+            showActions={true}
+            showSearch={true}
+            displayedModelIds={displayModels.map((m) => m.modelId)}
+            onAddModel={(model) => setProviderSettings({ models: [...displayModels, model] })}
+            onRemoveModel={(modelId) =>
+              setProviderSettings({ models: displayModels.filter((m) => m.modelId !== modelId) })
+            }
+          />
         </Modal>
       </Stack>
     </Stack>

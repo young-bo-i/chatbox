@@ -11,6 +11,7 @@ import { ImportProviderModal } from '@/components/settings/provider/ImportProvid
 import { ProviderList } from '@/components/settings/provider/ProviderList'
 import { useProviderImport } from '@/hooks/useProviderImport'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
+import { useSystemProviders } from '@/hooks/useSystemProviders'
 import useVersion from '@/hooks/useVersion'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { add as addToast } from '@/stores/toastActions'
@@ -35,17 +36,33 @@ export function RouteComponent() {
   const customProviders = useSettingsStore((state) => state.customProviders)
   const providersMap = useSettingsStore((state) => state.providers)
   const { isExceeded } = useVersion()
+  const { enabledProviders, shouldFilter } = useSystemProviders()
 
   const providers = useMemo<ProviderInfo[]>(
     () =>
       [
-        ...SystemProviders.filter((p) => !(isExceeded && p.name.toLocaleLowerCase().match(/openai|claude|gemini/i))),
+        ...SystemProviders.filter((p) => {
+          // 隐藏 Chatbox AI
+          if (p.id === 'chatbox-ai') {
+            return false
+          }
+          // 版本限制过滤
+          if (isExceeded && p.name.toLocaleLowerCase().match(/openai|claude|gemini/i)) {
+            return false
+          }
+          // 管理员配置的显示/隐藏过滤
+          // 如果后端有配置，则只显示启用的提供方；否则显示所有
+          if (shouldFilter && !enabledProviders.includes(p.id)) {
+            return false
+          }
+          return true
+        }),
         ...(customProviders || []),
       ].map((p) => ({
         ...p,
         ...(providersMap?.[p.id] || {}),
       })),
-    [customProviders, isExceeded, providersMap]
+    [customProviders, isExceeded, providersMap, enabledProviders, shouldFilter]
   )
 
   const [newProviderModalOpened, setNewProviderModalOpened] = useState(false)

@@ -16,6 +16,7 @@ import { ScalableIcon } from '@/components/ScalableIcon'
 import { useMyCopilots, useRemoteCopilots } from '@/hooks/useCopilots'
 import { useProviders } from '@/hooks/useProviders'
 import { useIsSmallScreen } from '@/hooks/useScreenChange'
+import { useSystemProviders } from '@/hooks/useSystemProviders'
 import { router } from '@/router'
 import { createSession as createSessionStore } from '@/stores/chatStore'
 import { submitNewUserMessage, switchCurrentSession } from '@/stores/sessionActions'
@@ -46,6 +47,15 @@ function Index() {
   })
 
   const { providers } = useProviders()
+  const { systemProviders, loading: systemProvidersLoading } = useSystemProviders()
+  
+  // 检查是否有可用的 provider（包括后端配置的 EnterAI）
+  const hasAvailableProvider = useMemo(() => {
+    if (providers.length > 0) return true
+    // 检查后端是否配置了 EnterAI
+    const enterAIConfig = systemProviders.find((p) => p.providerId === 'enter-ai')
+    return enterAIConfig?.hasSystemKey && enterAIConfig?.models && enterAIConfig.models.length > 0
+  }, [providers, systemProviders])
 
   const selectedModel = useMemo(() => {
     if (session.settings?.provider && session.settings?.modelId) {
@@ -157,7 +167,7 @@ function Index() {
           </Text>
         </Stack>
 
-        {!providers.length && (
+        {!systemProvidersLoading && !hasAvailableProvider && (
           <Box px="sm">
             <Paper
               radius="md"

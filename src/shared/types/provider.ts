@@ -2,6 +2,7 @@
 // This file helps prevent circular dependencies
 
 export enum ModelProviderEnum {
+  EnterAI = 'enter-ai',
   ChatboxAI = 'chatbox-ai',
   OpenAI = 'openai',
   OpenAIResponses = 'openai-responses',
@@ -23,6 +24,7 @@ export enum ModelProviderEnum {
 }
 
 export enum ModelProviderType {
+  EnterAI = 'enter-ai',
   ChatboxAI = 'chatbox-ai',
   OpenAI = 'openai',
   Gemini = 'gemini',

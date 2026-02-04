@@ -3,6 +3,8 @@ import { ModelProviderEnum } from 'src/shared/types'
 import * as atoms from './atoms'
 import { settingsStore } from './settingsStore'
 
+const API_BASE_URL = process.env.API_BASE_URL || ''
+
 export function needEditSetting() {
   const settings = settingsStore.getState()
 
@@ -18,6 +20,10 @@ export function needEditSetting() {
     if (keys.filter((key) => !!providers[key].apiKey).length > 0) {
       return false
     }
+    // EnterAI 配置了模型（可能是从后端同步的）
+    if (providers[ModelProviderEnum.EnterAI]?.models?.length) {
+      return false
+    }
     // Ollama / LMStudio/ custom provider 配置了至少一个模型
     if (
       keys.filter(
@@ -31,6 +37,36 @@ export function needEditSetting() {
       return false
     }
   }
+  return true
+}
+
+/**
+ * 异步检查是否需要编辑设置
+ * 会先检查后端是否配置了 EnterAI
+ */
+export async function needEditSettingAsync(): Promise<boolean> {
+  // 先检查本地配置
+  if (!needEditSetting()) {
+    return false
+  }
+
+  // 检查后端是否配置了 EnterAI
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/config/providers`)
+    if (response.ok) {
+      const data = await response.json()
+      const enterAIConfig = data.providers?.find(
+        (p: any) => p.providerId === 'enter-ai' || p.name === 'EnterAI'
+      )
+      // 如果后端配置了 EnterAI（有系统 Key 和 models）
+      if (enterAIConfig?.hasSystemKey && enterAIConfig?.models?.length > 0) {
+        return false
+      }
+    }
+  } catch (error) {
+    console.error('Failed to check server config:', error)
+  }
+
   return true
 }
 

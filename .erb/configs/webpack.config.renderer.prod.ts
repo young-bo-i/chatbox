@@ -168,6 +168,8 @@ const configuration: webpack.Configuration = {
 
     new webpack.DefinePlugin({
       'process.type': '"renderer"',
+      // 生产环境默认使用相对路径（通过 Nginx 反向代理）
+      'process.env.API_BASE_URL': JSON.stringify(process.env.API_BASE_URL || ''),
     }),
     // 禁用混淆，加快构建速度
     // new JavaScriptObfuscator({

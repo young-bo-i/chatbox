@@ -1,10 +1,50 @@
+# 本地开发: docker compose up -d --build
+# 服务器部署: docker compose up -d (自动拉取远程镜像)
+
 services:
+  chatbox-db:
+    image: mysql:8.0
+    container_name: chatbox-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    expose:
+      - "3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chatbox-backend:
+    image: ghcr.io/young-bo-i/chatbox-backend:latest
+    build: ./backend
+    container_name: chatbox-backend
+    restart: unless-stopped
+    depends_on:
+      chatbox-db:
+        condition: service_healthy
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_HOST=chatbox-db
+      - DB_PORT=3306
+      - DB_USER=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_NAME=${MYSQL_DATABASE}
+    expose:
+      - "8080"
+
   chatbox-web:
-    image: ghcr.io/young-bo-i/chatbox:latest
+    image: ghcr.io/young-bo-i/chatbox-web:latest
+    build: .
     container_name: chatbox-web
     restart: unless-stopped
+    depends_on:
+      - chatbox-backend
     ports:
       - "9980:80"
-    # Uncomment the following if you need to use a different port
-    # ports:
-    #   - "8080:80"

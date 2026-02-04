@@ -152,22 +152,32 @@ export function getDefaultPrompt() {
 
 export function chatSessionSettings(): SessionSettings {
   return {
-    provider: ModelProviderEnum.ChatboxAI,
-    modelId: 'chatboxai-4',
+    provider: ModelProviderEnum.EnterAI,
+    modelId: 'gpt-4o', // 默认模型，会被后端配置覆盖
     maxContextMessageCount: 6,
   }
 }
 
 export function pictureSessionSettings(): SessionSettings {
   return {
-    provider: ModelProviderEnum.ChatboxAI,
-    modelId: 'DALL-E-3',
+    provider: ModelProviderEnum.EnterAI,
+    modelId: 'dall-e-3',
     imageGenerateNum: 1,
     dalleStyle: 'vivid',
   }
 }
 
 export const SystemProviders: ProviderBaseInfo[] = [
+  {
+    id: ModelProviderEnum.EnterAI,
+    name: 'EnterAI',
+    type: ModelProviderType.OpenAI,
+    description: 'System default AI provider',
+    defaultSettings: {
+      apiHost: '',
+      models: [],
+    },
+  },
   {
     id: ModelProviderEnum.ChatboxAI,
     name: 'Chatbox AI',

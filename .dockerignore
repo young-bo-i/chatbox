@@ -1,20 +1,21 @@
-# Dependencies
-node_modules/
-.npm
-
-# Build outputs
-release/app/dist/
-release/build/
-dist/
-.erb/dll/
-
 # Git
 .git
 .gitignore
 
+# Node
+node_modules
+npm-debug.log*
+
+# Build output
+dist
+out
+.erb/dll
+release/build
+release/app/dist
+
 # IDE
-.idea/
-.vscode/
+.idea
+.vscode
 *.swp
 *.swo
 
@@ -22,29 +23,29 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-logs/
+# Data
+data/
 
-# Test
-coverage/
-.nyc_output/
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
 
-# Environment
-.env
-.env.*
-*.local
+# Backend (前端构建不需要)
+backend/
 
-# Documentation
-doc/
+# Docs
 docs/
 *.md
 !README.md
 
-# Mobile (not needed for web build)
-ios/
-android/
+# Test
+__tests__
+*.test.*
+*.spec.*
+coverage/
 
 # Misc
-tmp/
-*.tgz
+.env*
+*.log
+.cache

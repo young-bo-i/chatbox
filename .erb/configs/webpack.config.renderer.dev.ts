@@ -158,6 +158,11 @@ const configuration: webpack.Configuration = {
       NODE_ENV: 'development',
     }),
 
+    new webpack.DefinePlugin({
+      // 开发环境默认使用本地后端
+      'process.env.API_BASE_URL': JSON.stringify(process.env.API_BASE_URL || 'http://localhost:8080'),
+    }),
+
     new webpack.LoaderOptionsPlugin({
       debug: true,
     }),

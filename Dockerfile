@@ -1,39 +1,44 @@
 # ============================================
-# Stage 1: Build
+# Stage 1: 安装依赖 (利用缓存)
 # ============================================
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS deps
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 make g++ git
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-# Copy package files and npm config first for better layer caching
-COPY package*.json ./
-COPY .npmrc ./
-
-# Install dependencies (skip postinstall as it contains electron-specific commands)
+# 只复制依赖相关文件
+COPY package*.json .npmrc ./
 RUN npm install --ignore-scripts
 
-# Copy source code
+# ============================================
+# Stage 2: 构建
+# ============================================
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# 从 deps 阶段复制 node_modules
+COPY --from=deps /app/node_modules ./node_modules
+
+# 复制源代码（.dockerignore 排除不需要的文件）
 COPY . .
 
-# Run only the necessary parts of postinstall for web build
+# 应用补丁（如果有）
 RUN npx patch-package || true
 
-# Build web version directly (skip delete-sourcemaps script that has issues)
-RUN npx cross-env CHATBOX_BUILD_PLATFORM=web NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true \
+# 构建 (增加 Node 内存限制到 8GB)
+ENV NODE_OPTIONS="--max-old-space-size=8192"
+RUN npx cross-env CHATBOX_BUILD_PLATFORM=web NODE_ENV=production \
+    TS_NODE_TRANSPILE_ONLY=true API_BASE_URL= \
     webpack --config ./.erb/configs/webpack.config.renderer.prod.ts
 
 # ============================================
-# Stage 2: Production
+# Stage 3: 生产镜像
 # ============================================
 FROM nginx:alpine
 
-# Copy built files from builder stage
 COPY --from=builder /app/release/app/dist/renderer /usr/share/nginx/html
-
-# Copy custom nginx config for SPA routing
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

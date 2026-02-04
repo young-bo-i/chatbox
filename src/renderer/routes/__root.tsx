@@ -55,6 +55,8 @@ import * as premiumActions from '@/stores/premiumActions'
 import * as settingActions from '@/stores/settingActions'
 import { settingsStore, useLanguage, useSettingsStore, useTheme } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useAuthStore } from '@/stores/authStore'
+import { useEnterAISync } from '@/hooks/useEnterAISync'
 
 function Root() {
   const location = useLocation()
@@ -63,6 +65,15 @@ function Root() {
   const initialized = useRef(false)
 
   const setOpenAboutDialog = useUIStore((s) => s.setOpenAboutDialog)
+  const checkAuth = useAuthStore((s) => s.checkAuth)
+
+  // 启动时检查认证状态
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
+
+  // 启动时同步 EnterAI 配置
+  useEnterAISync()
 
   const setRemoteConfig = useSetAtom(atoms.remoteConfigAtom)
 
@@ -78,9 +89,10 @@ function Root() {
           .getRemoteConfig('setting_chatboxai_first')
           .catch(() => ({ setting_chatboxai_first: false }) as RemoteConfig)
         setRemoteConfig((conf) => ({ ...conf, ...remoteConfig }))
-        // 是否需要弹出设置窗口
+        // 是否需要弹出设置窗口（异步检查，包括后端配置）
         initialized.current = true
-        if (settingActions.needEditSetting() && location.pathname !== '/settings/mcp') {
+        const needSetup = await settingActions.needEditSettingAsync()
+        if (needSetup && location.pathname !== '/settings/mcp') {
           await NiceModal.show('welcome')
           return
         }

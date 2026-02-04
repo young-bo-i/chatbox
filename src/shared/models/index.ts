@@ -10,6 +10,7 @@ import {
 import type { ModelDependencies } from '../types/adapters'
 import AzureOpenAI from './azure'
 import ChatboxAI from './chatboxai'
+// EnterAI uses OpenAI compatible API
 import ChatGLM from './chatglm'
 import Claude from './claude'
 import CustomClaude from './custom-claude'
@@ -78,6 +79,31 @@ export function getModel(
   }
 
   switch (provider) {
+    case ModelProviderEnum.EnterAI: {
+      // EnterAI uses OpenAI compatible API
+      // 如果没有本地 API Key，使用后端代理
+      const hasLocalApiKey = !!providerSetting.apiKey
+      const apiKey = hasLocalApiKey ? providerSetting.apiKey : 'proxy-placeholder'
+      // 后端代理地址：使用完整路径格式，这样 normalizeOpenAIApiHostAndPath 不会修改它
+      // 代理端点是 /api/proxy/chat/completions
+      const apiHost = hasLocalApiKey ? (formattedApiHost || 'https://api.openai.com') : '/api/proxy/v1/chat/completions'
+      
+      return new OpenAI(
+        {
+          apiKey,
+          apiHost,
+          model: model,
+          dalleStyle: settings.dalleStyle || 'vivid',
+          temperature: settings.temperature,
+          topP: settings.topP,
+          maxOutputTokens: settings.maxTokens,
+          injectDefaultMetadata: globalSettings.injectDefaultMetadata,
+          useProxy: false,
+          stream: settings.stream,
+        },
+        dependencies
+      )
+    }
     case ModelProviderEnum.ChatboxAI:
       return new ChatboxAI(
         {
@@ -386,6 +412,7 @@ export function getModel(
 }
 
 export const aiProviderNameHash: Record<ModelProvider, string> = {
+  [ModelProviderEnum.EnterAI]: 'EnterAI',
   [ModelProviderEnum.OpenAI]: 'OpenAI API',
   [ModelProviderEnum.OpenAIResponses]: 'OpenAI Responses API',
   [ModelProviderEnum.Azure]: 'Azure OpenAI API',
@@ -408,9 +435,15 @@ export const aiProviderNameHash: Record<ModelProvider, string> = {
 
 export const AIModelProviderMenuOptionList = [
   {
+    value: ModelProviderEnum.EnterAI,
+    label: aiProviderNameHash[ModelProviderEnum.EnterAI],
+    featured: true,
+    disabled: false,
+  },
+  {
     value: ModelProviderEnum.ChatboxAI,
     label: aiProviderNameHash[ModelProviderEnum.ChatboxAI],
-    featured: true,
+    featured: false,
     disabled: false,
   },
   {

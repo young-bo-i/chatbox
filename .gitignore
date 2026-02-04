@@ -175,3 +175,9 @@ electron-builder.env
 **/routeTree.gen.ts
 
 .env.sentry-build-plugin
+
+# 数据目录 (MySQL 数据)
+/data/
+
+# 环境配置文件
+.env

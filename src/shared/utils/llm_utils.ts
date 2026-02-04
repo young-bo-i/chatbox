@@ -26,8 +26,8 @@ export function normalizeOpenAIApiHostAndPath(
   if (apiPath && !apiPath.startsWith('/')) {
     apiPath = '/' + apiPath
   }
-  // https 协议
-  if (apiHost && !apiHost.startsWith('http://') && !apiHost.startsWith('https://')) {
+  // https 协议（相对路径以 / 开头，不需要添加协议）
+  if (apiHost && !apiHost.startsWith('http://') && !apiHost.startsWith('https://') && !apiHost.startsWith('/')) {
     apiHost = 'https://' + apiHost
   }
   // 如果用户在 host 配置了完整的 host+path 接口地址

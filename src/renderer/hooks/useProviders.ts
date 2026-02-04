@@ -3,11 +3,19 @@ import { SystemProviders } from 'src/shared/defaults'
 import { ModelProviderEnum, type ProviderInfo } from 'src/shared/types'
 import { useSettingsStore } from '@/stores/settingsStore'
 import useChatboxAIModels from './useChatboxAIModels'
+import { useSystemProviders } from './useSystemProviders'
 
 export const useProviders = () => {
   const { chatboxAIModels } = useChatboxAIModels()
+  const { systemProviders } = useSystemProviders()
   const { setSettings, ...settings } = useSettingsStore((state) => state)
   const providerSettingsMap = settings.providers
+
+  // 检查 EnterAI 是否在后端配置了
+  const enterAISystemConfig = useMemo(
+    () => systemProviders.find((p) => p.providerId === 'enter-ai'),
+    [systemProviders]
+  )
 
   const allProviderBaseInfos = useMemo(
     () => [...SystemProviders, ...(settings.customProviders || [])],
@@ -24,6 +32,16 @@ export const useProviders = () => {
               ...providerSettings,
               models: chatboxAIModels,
             }
+          } else if (p.id === ModelProviderEnum.EnterAI) {
+            // EnterAI: 如果后端配置了（有系统 Key 和 models），或者本地有配置，则包含
+            if (enterAISystemConfig?.hasSystemKey || providerSettings?.apiKey || providerSettings?.models?.length) {
+              return {
+                models: p.defaultSettings?.models,
+                ...p,
+                ...providerSettings,
+              } as ProviderInfo
+            }
+            return null
           } else if (
             (!p.isCustom && providerSettings?.apiKey) ||
             ((p.isCustom || p.id === ModelProviderEnum.Ollama || p.id === ModelProviderEnum.LMStudio) &&
@@ -40,7 +58,7 @@ export const useProviders = () => {
           }
         })
         .filter((p) => !!p),
-    [providerSettingsMap, allProviderBaseInfos, chatboxAIModels, settings.licenseKey]
+    [providerSettingsMap, allProviderBaseInfos, chatboxAIModels, settings.licenseKey, enterAISystemConfig]
   )
 
   const favoritedModels = useMemo(

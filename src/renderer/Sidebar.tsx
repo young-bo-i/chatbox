@@ -5,9 +5,12 @@ import {
   IconCode,
   IconInfoCircle,
   IconLayoutSidebarLeftCollapse,
+  IconLogin,
+  IconLogout,
   IconMessageChatbot,
   IconPhotoPlus,
   IconSettingsFilled,
+  IconUser,
 } from '@tabler/icons-react'
 import { useNavigate } from '@tanstack/react-router'
 import clsx from 'clsx'
@@ -23,6 +26,7 @@ import useVersion from './hooks/useVersion'
 import { navigateToSettings } from './modals/Settings'
 import { trackingEvent } from './packages/event'
 import icon from './static/icon.png'
+import { useAuthStore } from './stores/authStore'
 import { createEmpty } from './stores/sessionActions'
 import { useLanguage } from './stores/settingsStore'
 import { useUIStore } from './stores/uiStore'
@@ -36,6 +40,7 @@ export default function Sidebar() {
   const showSidebar = useUIStore((s) => s.showSidebar)
   const setShowSidebar = useUIStore((s) => s.setShowSidebar)
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
+  const { isAuthenticated, isAdmin, user, clearAuth } = useAuthStore()
 
   const sessionListViewportRef = useRef<HTMLDivElement>(null)
 
@@ -196,6 +201,55 @@ export default function Sidebar() {
             variant="light"
             p="xs"
           />
+          {isAuthenticated ? (
+            <NavLink
+              c="chatbox-tertiary"
+              className="rounded"
+              label={
+                <Flex align="center" gap="xs">
+                  <Text span size="sm">{user?.username}</Text>
+                  {isAdmin && (
+                    <Text span size="xs" c="blue" fw={500}>
+                      [{t('Admin')}]
+                    </Text>
+                  )}
+                </Flex>
+              }
+              leftSection={<ScalableIcon icon={IconUser} size={20} />}
+              rightSection={
+                <Tooltip label={t('Logout')}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="chatbox-tertiary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      clearAuth()
+                    }}
+                  >
+                    <IconLogout size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              }
+              variant="light"
+              p="xs"
+            />
+          ) : (
+            <NavLink
+              c="chatbox-secondary"
+              className="rounded"
+              label={t('Login')}
+              leftSection={<ScalableIcon icon={IconLogin} size={20} />}
+              onClick={() => {
+                navigate({ to: '/auth/login' })
+                if (isSmallScreen) {
+                  setShowSidebar(false)
+                }
+              }}
+              variant="light"
+              p="xs"
+            />
+          )}
           {FORCE_ENABLE_DEV_PAGES && (
             <NavLink
               c="chatbox-secondary"
