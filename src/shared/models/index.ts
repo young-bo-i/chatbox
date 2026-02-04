@@ -84,9 +84,8 @@ export function getModel(
       // 如果没有本地 API Key，使用后端代理
       const hasLocalApiKey = !!providerSetting.apiKey
       const apiKey = hasLocalApiKey ? providerSetting.apiKey : 'proxy-placeholder'
-      // 后端代理地址：使用完整路径格式，这样 normalizeOpenAIApiHostAndPath 不会修改它
-      // 代理端点是 /api/proxy/chat/completions
-      const apiHost = hasLocalApiKey ? (formattedApiHost || 'https://api.openai.com') : '/api/proxy/v1/chat/completions'
+      // 后端代理地址：使用 /api/proxy/v1，ai-sdk 会自动添加 /chat/completions 或 /images/generations
+      const apiHost = hasLocalApiKey ? (formattedApiHost || 'https://api.openai.com') : '/api/proxy/v1'
       
       return new OpenAI(
         {

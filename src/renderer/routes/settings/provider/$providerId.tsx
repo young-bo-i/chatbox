@@ -1214,7 +1214,7 @@ function EnterAISettings() {
             </>
           ) : (
             <Text size="sm" c="chatbox-tertiary">
-              {systemConfig?.apiHost || providerSettings?.apiHost || t('Not configured')}
+              {systemConfig?.apiHost || providerSettings?.apiHost ? '••••••••••••••••' : t('Not configured')}
             </Text>
           )}
         </Stack>

@@ -166,13 +166,10 @@ export default class DesktopPlatform implements Platform {
   }
 
   public initTracking(): void {
-    setTimeout(() => {
-      this.trackingEvent('user_engagement', {})
-    }, 4000) // 怀疑应用初始化后需要一段时间才能正常工作
+    // Tracking disabled
   }
   public trackingEvent(name: string, params: { [key: string]: string }) {
-    const dataJson = JSON.stringify({ name, params })
-    this.ipc.invoke('analysticTrackingEvent', dataJson)
+    // Tracking disabled
   }
 
   public async shouldShowAboutDialogWhenStartUp(): Promise<boolean> {

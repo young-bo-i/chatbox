@@ -77,6 +77,7 @@ func main() {
 		proxy := api.Group("/proxy")
 		{
 			proxy.POST("/v1/chat/completions", handlers.ProxyChatCompletion)
+			proxy.POST("/v1/images/generations", handlers.ProxyImageGeneration)
 		}
 
 		// 管理员相关 (需要管理员权限)

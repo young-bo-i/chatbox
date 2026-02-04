@@ -662,11 +662,11 @@ async function migrate_9_to_10(dataStore: MigrateStore): Promise<boolean> {
                 topP: oldSessionSettings.topP ?? oldSettings.topP,
               }
             : {
-                provider: [ModelProviderEnum.ChatboxAI, ModelProviderEnum.OpenAI, ModelProviderEnum.Azure].includes(
+                provider: [ModelProviderEnum.EnterAI, ModelProviderEnum.OpenAI, ModelProviderEnum.Azure].includes(
                   oldSettings.aiProvider
                 )
                   ? oldSettings.aiProvider
-                  : ModelProviderEnum.ChatboxAI,
+                  : ModelProviderEnum.EnterAI,
                 modelId: 'DALL-E-3',
                 imageGenerateNum: oldSessionSettings.imageGenerateNum ?? 3,
                 dalleStyle: oldSessionSettings.dalleStyle ?? 'vivid',
