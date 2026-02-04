@@ -1,0 +1,10 @@
+services:
+  chatbox-web:
+    image: ghcr.io/young-bo-i/chatbox:latest
+    container_name: chatbox-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    # Uncomment the following if you need to use a different port
+    # ports:
+    #   - "8080:80"
