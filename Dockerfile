@@ -21,8 +21,9 @@ COPY . .
 # Run only the necessary parts of postinstall for web build
 RUN npx patch-package || true
 
-# Build web version
-RUN npm run build:web
+# Build web version directly (skip delete-sourcemaps script that has issues)
+RUN npx cross-env CHATBOX_BUILD_PLATFORM=web NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true \
+    webpack --config ./.erb/configs/webpack.config.renderer.prod.ts
 
 # ============================================
 # Stage 2: Production
