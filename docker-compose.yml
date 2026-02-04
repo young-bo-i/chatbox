@@ -4,7 +4,7 @@ services:
     container_name: chatbox-web
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "9980:80"
     # Uncomment the following if you need to use a different port
     # ports:
     #   - "8080:80"
