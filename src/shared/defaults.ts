@@ -153,7 +153,7 @@ export function getDefaultPrompt() {
 export function chatSessionSettings(): SessionSettings {
   return {
     provider: ModelProviderEnum.EnterAI,
-    modelId: 'gpt-4o', // 默认模型，会被后端配置覆盖
+    modelId: 'gpt-4o-mini', // 默认模型
     maxContextMessageCount: 6,
   }
 }

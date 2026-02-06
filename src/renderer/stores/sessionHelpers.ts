@@ -404,6 +404,27 @@ export function mergeSettings(
 export function initEmptyChatSession(): Omit<Session, 'id'> {
   const settings = settingsStore.getState().getSettings()
   const { chat: lastUsedChatModel } = lastUsedModelStore.getState()
+
+  // 确定默认模型
+  let defaultModel: { provider: string; modelId: string }
+  if (settings.defaultChatModel) {
+    // 1. 优先使用用户设置的默认模型
+    defaultModel = {
+      provider: settings.defaultChatModel.provider,
+      modelId: settings.defaultChatModel.model,
+    }
+  } else if (lastUsedChatModel?.provider && lastUsedChatModel?.modelId) {
+    // 2. 使用最后使用的模型
+    defaultModel = lastUsedChatModel
+  } else {
+    // 3. 使用系统默认 (EnterAI gpt-4o-mini)
+    const defaultSessionSettings = defaults.chatSessionSettings()
+    defaultModel = {
+      provider: defaultSessionSettings.provider || 'enter-ai',
+      modelId: defaultSessionSettings.modelId || 'gpt-4o-mini',
+    }
+  }
+
   const newSession: Omit<Session, 'id'> = {
     name: 'Untitled',
     type: 'chat',
@@ -412,12 +433,8 @@ export function initEmptyChatSession(): Omit<Session, 'id'> {
       maxContextMessageCount: settings.maxContextMessageCount || 6,
       temperature: settings.temperature || undefined,
       topP: settings.topP || undefined,
-      ...(settings.defaultChatModel
-        ? {
-            provider: settings.defaultChatModel.provider,
-            modelId: settings.defaultChatModel.model,
-          }
-        : lastUsedChatModel),
+      provider: defaultModel.provider,
+      modelId: defaultModel.modelId,
     },
   }
   if (settings.defaultPrompt) {
